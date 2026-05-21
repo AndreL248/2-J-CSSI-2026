@@ -1,0 +1,10 @@
+def doubly_not_less(n):
+    if n[::-1]>= n:
+        return n
+    
+    x = int(n)
+    while True:
+        x += 1
+        s = str(x)
+        if s[::-1] >= n:
+            return s
