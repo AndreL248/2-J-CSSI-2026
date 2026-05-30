@@ -1,0 +1,97 @@
+class Dinglemouse(object):
+
+    def __init__(self, queues, capacity):
+        self.queues = queues
+        self.capacity = capacity
+
+    def theLift(self):
+
+        queues = [list(q) for q in self.queues]
+
+        floor = 0
+        direction = 1
+        lift = []
+        result = [0]
+        top = len(queues) - 1
+
+        while True:
+
+            stopped = False
+
+            # bajar pasajeros
+            if floor in lift:
+                lift = [x for x in lift if x != floor]
+                stopped = True
+
+            # subir pasajeros
+            remain = []
+
+            for p in queues[floor]:
+
+                if len(lift) < self.capacity:
+
+                    if direction == 1 and p > floor:
+                        lift.append(p)
+                        stopped = True
+
+                    elif direction == -1 and p < floor:
+                        lift.append(p)
+                        stopped = True
+
+                    else:
+                        remain.append(p)
+
+                else:
+                    remain.append(p)
+
+            queues[floor] = remain
+
+            if stopped and result[-1] != floor:
+                result.append(floor)
+
+            # terminar
+            if not lift and not any(queues):
+                break
+
+            # buscar solicitudes
+            up = False
+            down = False
+
+            # pasajeros dentro
+            for p in lift:
+                if p > floor:
+                    up = True
+                if p < floor:
+                    down = True
+
+            # gente esperando
+            for f, q in enumerate(queues):
+                for p in q:
+                    if p > f:
+                        up = True
+                    if p < f:
+                        down = True
+
+            # cambiar dirección correctamente
+            if direction == 1:
+                if not up:
+                    direction = -1
+            else:
+                if not down:
+                    direction = 1
+
+            floor += direction
+
+            # límites
+            if floor < 0:
+                floor = 0
+                direction = 1
+
+            elif floor > top:
+                floor = top
+                direction = -1
+
+        if result[-1] != 0:
+            result.append(0)
+
+        return result
