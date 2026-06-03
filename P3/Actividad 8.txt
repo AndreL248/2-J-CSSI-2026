@@ -1,0 +1,149 @@
+import re
+
+class Compiler(object):
+
+    def compile(self, program):
+        return self.pass3(self.pass2(self.pass1(program)))
+
+    def tokenize(self, program):
+        token_iter = (
+            m.group(0)
+            for m in re.finditer(r'[-+*/()[\]]|[A-Za-z]+|\d+', program)
+        )
+        return [int(tok) if tok.isdigit() else tok for tok in token_iter]
+
+    # ---------- PASS 1 ----------
+
+    def pass1(self, program):
+        self.tokens = self.tokenize(program)
+        self.pos = 0
+
+        self._eat('[')
+
+        args = []
+        while self.tokens[self.pos] != ']':
+            args.append(self.tokens[self.pos])
+            self.pos += 1
+
+        self._eat(']')
+
+        self.args = {name: i for i, name in enumerate(args)}
+
+        return self._expr()
+
+    def _eat(self, tok):
+        if self.tokens[self.pos] == tok:
+            self.pos += 1
+
+    def _expr(self):
+        node = self._term()
+
+        while (
+            self.pos < len(self.tokens)
+            and self.tokens[self.pos] in ('+', '-')
+        ):
+            op = self.tokens[self.pos]
+            self.pos += 1
+            node = {
+                'op': op,
+                'a': node,
+                'b': self._term()
+            }
+
+        return node
+
+    def _term(self):
+        node = self._factor()
+
+        while (
+            self.pos < len(self.tokens)
+            and self.tokens[self.pos] in ('*', '/')
+        ):
+            op = self.tokens[self.pos]
+            self.pos += 1
+            node = {
+                'op': op,
+                'a': node,
+                'b': self._factor()
+            }
+
+        return node
+
+    def _factor(self):
+        tok = self.tokens[self.pos]
+
+        if isinstance(tok, int):
+            self.pos += 1
+            return {'op': 'imm', 'n': tok}
+
+        if isinstance(tok, str) and tok.isalpha():
+            self.pos += 1
+            return {'op': 'arg', 'n': self.args[tok]}
+
+        if tok == '(':
+            self.pos += 1
+            node = self._expr()
+            self._eat(')')
+            return node
+
+    # ---------- PASS 2 ----------
+
+    def pass2(self, ast):
+        if ast['op'] in ('imm', 'arg'):
+            return ast
+
+        a = self.pass2(ast['a'])
+        b = self.pass2(ast['b'])
+
+        if a['op'] == 'imm' and b['op'] == 'imm':
+            x = a['n']
+            y = b['n']
+
+            if ast['op'] == '+':
+                return {'op': 'imm', 'n': x + y}
+            if ast['op'] == '-':
+                return {'op': 'imm', 'n': x - y}
+            if ast['op'] == '*':
+                return {'op': 'imm', 'n': x * y}
+            if ast['op'] == '/':
+                return {'op': 'imm', 'n': x // y}
+
+        return {
+            'op': ast['op'],
+            'a': a,
+            'b': b
+        }
+
+    # ---------- PASS 3 ----------
+
+    def pass3(self, ast):
+        return self._gen(ast)
+
+    def _gen(self, node):
+        op = node['op']
+
+        if op == 'imm':
+            return [f"IM {node['n']}"]
+
+        if op == 'arg':
+            return [f"AR {node['n']}"]
+
+        asm = []
+
+        asm += self._gen(node['a'])
+        asm += ["PU"]
+
+        asm += self._gen(node['b'])
+        asm += ["SW"]
+        asm += ["PO"]
+
+        if op == '+':
+            asm += ["AD"]
+        elif op == '-':
+            asm += ["SU"]
+        elif op == '*':
+            asm += ["MU"]
+        elif op == '/':
+            asm += ["DI"]
+
+        return asm
